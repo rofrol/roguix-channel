@@ -1,0 +1,4 @@
+;; Roguix: Guix System with the Omarchy desktop for the Try Roguix app.
+(channel
+ (version 0)
+ (directory "modules"))

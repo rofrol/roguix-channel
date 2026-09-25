@@ -1,0 +1,5 @@
+;; Keys whose signatures Guix accepts on this channel's commits.
+(authorizations
+ (version 0)
+ (("7D1A 8B40 0C26 0998 097F 63E5 28B8 3B16 11FA 815E"
+   (name "roguix"))))
