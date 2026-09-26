@@ -187,7 +187,8 @@ configuration, Quickshell desktop shell, themes and helper commands.")
 
 ;; Omarchy's default applications (install/omarchy-base.packages): Guix's
 ;; packages, LibreWolf standing in for Chromium, and (roguix apps) for those
-;; Guix lacks. Not provided: LibreOffice, Pinta, LocalSend, Signal, Obsidian.
+;; Guix lacks. Not provided: LibreOffice, Pinta, LocalSend, Signal, Obsidian;
+;; docs/omarchy-packages.md lists every difference from Omarchy's list.
 (define %omarchy-applications
   (append
    (map specification->package
@@ -197,6 +198,10 @@ configuration, Quickshell desktop shell, themes and helper commands.")
           "less" "man-db" "tldr" "grim" "slurp" "hyprpicker" "wtype"
           "imagemagick" "yt-dlp" "tesseract-ocr" "pamixer" "brightnessctl"
           "playerctl" "unzip" "whois"
+          ;; Portals: file choosers and screen sharing for sandboxed apps.
+          "xdg-desktop-portal" "xdg-desktop-portal-gtk"
+          ;; The Secret Service; Omarchy's default keyring has no password.
+          "gnome-keyring"
           ;; Omarchy runs fcitx5 for compose keys; Chewing and Noto CJK back
           ;; the optional Traditional Chinese language.
           "fcitx5" "fcitx5-chewing" "fcitx5-gtk"
