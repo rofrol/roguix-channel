@@ -129,7 +129,16 @@
                 ;; The menu decides what is installed from pacman's database.
                 (substitute* (string-append omarchy "/shell/plugins/menu/MenuModel.js")
                   (("pacman -Qq; LC_ALL=C pacman -Qi") "roguix-pkg list; true")
-                  (("pacman -Q \"[$]1\"") "roguix-pkg present \"$1\"")))))
+                  (("pacman -Q \"[$]1\"") "roguix-pkg present \"$1\""))
+                ;; Guix's Qt 6.9 QML parser rejects `transient', a reserved
+                ;; word in its grammar, as a variable name, and Quickshell then
+                ;; skips the whole notification service.
+                (substitute* (string-append omarchy
+                                            "/shell/plugins/notifications/Service.qml")
+                  (("var transient = ") "var isTransient = ")
+                  (("\\{ transient = ") "{ isTransient = ")
+                  (("^( *)transient = !!" _ indent) (string-append indent "isTransient = !!"))
+                  (("return transient [|][|]") "return isTransient ||")))))
           (add-after 'install 'use-roguix-logo
             ;; omarchy-show-logo and friends print logo.txt: say GUIX, in
             ;; Omarchy's own block lettering, instead of OMARCHY.
@@ -146,7 +155,9 @@
                                      (string-append bin "/" (basename command))))
                           (find-files (string-append #$output
                                                      "/share/omarchy/bin")))))))))
-    (native-inputs (list python-minimal))
+    ;; patch-shebangs points Omarchy's Python commands here; the agent-usage
+    ;; ones need sqlite3, which python-minimal lacks.
+    (native-inputs (list python))
     (inputs (list bash))
     (home-page "https://omarchy.org")
     (synopsis "Omarchy desktop configuration, shell and commands")
@@ -181,17 +192,17 @@ configuration, Quickshell desktop shell, themes and helper commands.")
   (append
    (map specification->package
         '("librewolf" "xdg-utils" "nautilus" "evince" "gnome-disk-utility"
-          "xournalpp" "obs" "kdenlive" "btop"
+          "xournalpp" "kdenlive" "btop"
           "neovim" "tmux" "git" "bat" "eza" "fd" "ripgrep" "zoxide" "starship"
           "less" "man-db" "tldr" "grim" "slurp" "hyprpicker" "wtype"
           "imagemagick" "yt-dlp" "tesseract-ocr" "pamixer" "brightnessctl"
           "playerctl" "unzip" "whois"
           ;; Omarchy runs fcitx5 for compose keys; Chewing and Noto CJK back
           ;; the optional Traditional Chinese language.
-          "fcitx5" "fcitx5-chewing" "fcitx5-gtk" "fcitx5-qt"
+          "fcitx5" "fcitx5-chewing" "fcitx5-gtk"
           "font-google-noto-sans-cjk"))
    (list lazygit-bin lazydocker-bin gum-bin dua-bin cliamp-bin
-         fastfetch-without-zfs)))
+         fastfetch-without-zfs obs-without-vlc fcitx5-qt6)))
 
 ;;; Compatibility commands for Omarchy's Arch assumptions, plus Try Omarchy's
 ;;; xdg-terminal-exec and the per-user seed.
@@ -253,6 +264,30 @@ gate_failed() {
                   (call-with-output-file file
                     (lambda (port) (format port "#!~a~%~a" sh text)))
                   (chmod file #o555)))
+              ;; setpriv --pdeathsig SIGNAL COMMAND...: Guix's util-linux has
+              ;; no setpriv; Omarchy's shell uses only this option, to end its
+              ;; clipboard watchers with it.
+              (let ((file (string-append #$output "/bin/setpriv")))
+                (call-with-output-file file
+                  (lambda (port)
+                    (format port "#!~a~%~a"
+                            #$(file-append python-minimal "/bin/python3") "\
+import ctypes, os, signal, sys
+arguments = sys.argv[1:]
+while arguments and arguments[0].startswith('--'):
+    option = arguments.pop(0)
+    if option == '--':
+        break
+    if option != '--pdeathsig' or not arguments:
+        sys.exit(f'setpriv: Roguix supports only --pdeathsig, not {option}')
+    name = arguments.pop(0).upper()
+    number = int(name) if name.isdigit() else signal.Signals[
+        name if name.startswith('SIG') else 'SIG' + name]
+    # PR_SET_PDEATHSIG survives the exec below.
+    ctypes.CDLL(None, use_errno=True).prctl(1, int(number), 0, 0, 0)
+os.execvp(arguments[0], arguments)
+")))
+                (chmod file #o555))
               ;; uwsm-app [OPTIONS] -- COMMAND...: run COMMAND directly.
               (shim "uwsm-app" "\
 while [ $# -gt 0 ] && [ \"$1\" != -- ]; do shift; done
